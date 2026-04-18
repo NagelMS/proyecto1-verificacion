@@ -2,38 +2,45 @@
 // Definición del tipo de transacciones posibles en la fifo //
 //////////////////////////////////////////////////////////////
 
-typedef enum { lectura, escritura, reset} tipo_trans; 
+typedef enum { lectura, escritura, lectura_escritura, reset} tipo_trans;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 //Transacción: este objeto representa las transacciones que entran y salen de la fifo. //
 /////////////////////////////////////////////////////////////////////////////////////////
 class trans_fifo #(parameter width = 16);
-  rand int retardo; // tiempo de retardo en ciclos de reloj que se debe esperar antes de ejecutar la transacción
-  rand bit[width-1:0] dato; // este es el dato de la transacción
-  int tiempo; //Representa el tiempo  de la simulación en el que se ejecutó la transacción 
-  rand tipo_trans tipo; // lectura, escritura, reset;
+  rand int retardo;          // retardo en ciclos antes de ejecutar la transacción
+  rand bit[width-1:0] dato;  // dato de entrada al DUT (escritura o lectura_escritura)
+  bit[width-1:0] dato_leido; // dato de salida del DUT (lectura o lectura_escritura), no aleatorio
+  int tiempo;
+  rand tipo_trans tipo;
   int max_retardo;
- 
-  constraint const_retardo {retardo < max_retardo; retardo>0;}
 
-  function new(int ret =0,bit[width-1:0] dto=0,int tmp = 0, tipo_trans tpo = lectura, int mx_rtrd = 10);
-    this.retardo = ret;
-    this.dato = dto;
-    this.tiempo = tmp;
-    this.tipo = tpo;
+  constraint const_retardo {retardo < max_retardo; retardo > 0;}
+
+  function new(int ret =0, bit[width-1:0] dto=0, int tmp=0, tipo_trans tpo=lectura, int mx_rtrd=10);
+    this.retardo    = ret;
+    this.dato       = dto;
+    this.dato_leido = 0;
+    this.tiempo     = tmp;
+    this.tipo       = tpo;
     this.max_retardo = mx_rtrd;
   endfunction
-  
+
   function clean;
-    this.retardo = 0;
-    this.dato = 0;
-    this.tiempo = 0;
-    this.tipo = lectura;
-    
+    this.retardo    = 0;
+    this.dato       = 0;
+    this.dato_leido = 0;
+    this.tiempo     = 0;
+    this.tipo       = lectura;
   endfunction
-    
+
   function void print(string tag = "");
-    $display("[%g] %s Tiempo=%g Tipo=%s Retardo=%g dato=0x%h",$time,tag,tiempo,this.tipo,this.retardo,this.dato);
+    if (tipo == lectura_escritura)
+      $display("[%g] %s Tiempo=%g Tipo=%s Retardo=%g dato_in=0x%h dato_out=0x%h",
+               $time, tag, tiempo, this.tipo, this.retardo, this.dato, this.dato_leido);
+    else
+      $display("[%g] %s Tiempo=%g Tipo=%s Retardo=%g dato=0x%h",
+               $time, tag, tiempo, this.tipo, this.retardo, this.dato);
   endfunction
 endclass
 
