@@ -1,84 +1,116 @@
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// Checker/scoreboard: este objeto es responsable de verificar que el comportamiento del DUT sea el esperado //
-////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////
+// Checker: verifica que el comportamiento del DUT sea coherente con su especificación. //
+// Mantiene una referencia dorada (golden model) alimentada por el scoreboard con las   //
+// transacciones planificadas por el agente, y la contrasta con lo que observa el       //
+// monitor en las salidas reales del DUT.                                                //
+////////////////////////////////////////////////////////////////////////////////////////////
 
-class checker_c #(parameter width=16, parameter depth =8);
-  trans_fifo #(.width(width)) transaccion; //transacción recibida en el mailbox 
-  trans_fifo #(.width(width)) auxiliar; //transacción usada como auxiliar para leer el fifo emulado 
-  trans_sb   #(.width(width)) to_sb; // transacción usada para comunicarse con el scoreboard
-  trans_fifo  emul_fifo[$]; //this queue is going to be used as golden reference for the fifo
-  trans_fifo_mbx drv_chkr_mbx; // Este mailbox es el que comunica con el driver/monitor
-  trans_sb_mbx  chkr_sb_mbx; // Este mailbox es el que comunica el checker con el scoreboard
-  int contador_auxiliar; 
+class checker_c #(parameter width=16, parameter depth=8);
+  trans_fifo #(.width(width)) emul_fifo[$]; // referencia dorada (golden model)
+  trans_fifo_mbx mon_chkr_mbx;             // observaciones reales del DUT (desde monitor)
+  trans_fifo_mbx sb_chkr_mbx;              // transacciones planificadas (desde scoreboard)
+
+  trans_fifo #(.width(width)) trans_planeada;
+  trans_fifo #(.width(width)) trans_real;
+  trans_fifo #(.width(width)) esperado;
+  int transacciones_ok;
+  int transacciones_error;
 
   function new();
     this.emul_fifo = {};
-    this.contador_auxiliar = 0;
-  endfunction 
+    this.transacciones_ok = 0;
+    this.transacciones_error = 0;
+  endfunction
+
+  // Aplica una transacción planificada del agente al modelo dorado
+  function void aplicar_al_modelo(trans_fifo #(.width(width)) trans);
+    case (trans.tipo)
+      escritura: begin
+        if (emul_fifo.size() == depth) begin
+          void'(emul_fifo.pop_front()); // overflow: descarta el dato más antiguo
+          $display("[%g] Checker-Modelo: Overflow en escritura dato=0x%h", $time, trans.dato);
+        end
+        emul_fifo.push_back(trans);
+      end
+      reset: begin
+        emul_fifo = {};
+        $display("[%g] Checker-Modelo: Reset aplicado, FIFO emulada vaciada", $time);
+      end
+      lectura:           ; // las lecturas no modifican el estado del modelo
+      lectura_escritura: ; // la verificación y actualización se hacen en el paso de verificación
+    endcase
+  endfunction
 
   task run;
-   $display("[%g]  El checker fue inicializado",$time);
-   to_sb = new();
-   forever begin
-     to_sb = new();
-     drv_chkr_mbx.get(transaccion);
-     transaccion.print("Checker: Se recibe trasacción desde el driver");
-     to_sb.clean();
-     case(transaccion.tipo)
-       lectura: begin
-         if(0 !== emul_fifo.size()) begin //Revisa si el Fifo no está vacía
-           auxiliar = emul_fifo.pop_front();
-           if(transaccion.dato == auxiliar.dato) begin
-             to_sb.dato_enviado = auxiliar.dato;
-             to_sb.tiempo_push = auxiliar.tiempo;
-             to_sb.tiempo_pop = transaccion.dato;
-             to_sb.completado = 1;
-             to_sb.calc_latencia();
-             to_sb.print("Checker:Transaccion Completada");
-             chkr_sb_mbx.put(to_sb);
-           end else begin
-             transaccion.print("Checker: Error el dato de la transacción no calza con el esperado");
-            $display("Dato_leido= %h, Dato_Esperado = %h",transaccion.dato,auxiliar.dato);
-            $finish; 
-           end
-         end else begin // si está vacía genera un underflow 
-             to_sb.tiempo_pop = transaccion.tiempo;
-             to_sb.underflow = 1;
-             to_sb.print("Checker: Underflow");
-             chkr_sb_mbx.put(to_sb);
-         end
-       end
-       escritura: begin
-         if(emul_fifo.size() == depth)begin // Revisa si la Fifo está llena para generar un overflow
-           auxiliar = emul_fifo.pop_front();
-           to_sb.dato_enviado = auxiliar.dato;
-           to_sb.tiempo_push = auxiliar.tiempo;
-           to_sb.overflow = 1;
-           to_sb.print("Checker: Overflow");
-           chkr_sb_mbx.put(to_sb);
-           emul_fifo.push_back(transaccion);
-         end else begin  // En caso de no estar llena simplemente guarda el dato en la fifo simulada
-           transaccion.print("Checker: Escritura");
-           emul_fifo.push_back(transaccion);
-         end
-       end
-       reset: begin // en caso de reset vacía la fifo simulada y envía todos los datos perdidos al SB
-         contador_auxiliar = emul_fifo.size();
-         for(int i =0; i<contador_auxiliar; i++)begin
-           auxiliar = emul_fifo.pop_front();
-           to_sb.clean();
-           to_sb.dato_enviado = auxiliar.dato;
-           to_sb.tiempo_push = auxiliar.tiempo;
-           to_sb.reset = 1;
-           to_sb.print("Checker: Reset");
-           chkr_sb_mbx.put(to_sb);
-         end
-       end
-       default: begin
-         $display("[%g] Checker Error: la transacción recibida no tiene tipo valido",$time);
-         $finish;
-       end
-     endcase    
-   end 
+    $display("[%g] El checker fue inicializado", $time);
+    forever begin
+      // Drena transacciones planificadas pendientes para mantener el modelo actualizado
+      while (sb_chkr_mbx.try_get(trans_planeada)) begin
+        trans_planeada.print("Checker: Transaccion del scoreboard aplicada al modelo");
+        aplicar_al_modelo(trans_planeada);
+      end
+
+      // Espera la próxima observación real del DUT desde el monitor
+      mon_chkr_mbx.get(trans_real);
+      trans_real.print("Checker: Observacion recibida del monitor");
+
+      // Drena de nuevo por si llegaron transacciones planificadas en el mismo instante
+      while (sb_chkr_mbx.try_get(trans_planeada)) begin
+        trans_planeada.print("Checker: Transaccion del scoreboard aplicada al modelo");
+        aplicar_al_modelo(trans_planeada);
+      end
+
+      case (trans_real.tipo)
+        lectura: begin
+          if (emul_fifo.size() == 0) begin
+            $display("[%g] Checker: Underflow - lectura sin datos disponibles en la FIFO emulada", $time);
+          end else begin
+            esperado = emul_fifo.pop_front();
+            if (trans_real.dato_leido === esperado.dato) begin
+              transacciones_ok++;
+              $display("[%g] Checker: OK [%0d] - esperado=0x%h leido=0x%h latencia=%0dns",
+                       $time, transacciones_ok, esperado.dato, trans_real.dato_leido,
+                       trans_real.tiempo - esperado.tiempo);
+            end else begin
+              transacciones_error++;
+              $display("[%g] Checker: ERROR [%0d] - esperado=0x%h leido=0x%h",
+                       $time, transacciones_error, esperado.dato, trans_real.dato_leido);
+              $finish;
+            end
+          end
+        end
+        escritura: begin
+          $display("[%g] Checker: Escritura observada dato=0x%h", $time, trans_real.dato);
+        end
+        lectura_escritura: begin
+          // Verificar la parte de lectura (con el estado ANTES de la escritura)
+          if (emul_fifo.size() == 0) begin
+            $display("[%g] Checker: lectura_escritura - Underflow en lectura", $time);
+          end else begin
+            esperado = emul_fifo.pop_front();
+            if (trans_real.dato_leido === esperado.dato) begin
+              transacciones_ok++;
+              $display("[%g] Checker: OK lectura_escritura [%0d] - esperado=0x%h leido=0x%h",
+                       $time, transacciones_ok, esperado.dato, trans_real.dato_leido);
+            end else begin
+              transacciones_error++;
+              $display("[%g] Checker: ERROR lectura_escritura [%0d] - esperado=0x%h leido=0x%h",
+                       $time, transacciones_error, esperado.dato, trans_real.dato_leido);
+              $finish;
+            end
+          end
+          // Aplicar la parte de escritura al modelo (después de la lectura)
+          if (emul_fifo.size() == depth) begin
+            void'(emul_fifo.pop_front());
+            $display("[%g] Checker: lectura_escritura - Overflow en escritura dato=0x%h", $time, trans_real.dato);
+          end
+          emul_fifo.push_back(trans_real);
+        end
+        reset: begin
+          emul_fifo = {};
+          $display("[%g] Checker: Reset observado, modelo sincronizado con el DUT", $time);
+        end
+      endcase
+    end
   endtask
-endclass 
+endclass
