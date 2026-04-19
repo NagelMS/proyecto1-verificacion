@@ -113,9 +113,9 @@ endclass
 typedef enum {retardo_promedio,reporte} solicitud_sb;
 
 /////////////////////////////////////////////////////////////////////////
-// Definición de estructura para generar comandos hacia el agente      //
+// Definición de estructura para generar comandos hacia el generador     //
 /////////////////////////////////////////////////////////////////////////
-typedef enum {llenado_aleatorio,trans_aleatoria,trans_especifica,sec_trans_aleatorias} instrucciones_agente;
+typedef enum {llenado_aleatorio,trans_aleatoria,trans_especifica,sec_trans_aleatorias} instrucciones_gen;
 
 ///////////////////////////////////////////////////////////////////////////////////////
 // Definicion de mailboxes de tipo definido trans_fifo para comunicar las interfaces //
@@ -135,4 +135,4 @@ typedef mailbox #(solicitud_sb) comando_test_sb_mbx;
 ///////////////////////////////////////////////////////////////////////////////////////
 // Definicion de mailboxes de tipo definido trans_fifo para comunicar las interfaces //
 ///////////////////////////////////////////////////////////////////////////////////////
-typedef mailbox #(instrucciones_agente) comando_test_agent_mbx;
+typedef mailbox #(instrucciones_gen) comando_test_gen_mbx;
