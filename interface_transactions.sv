@@ -126,7 +126,7 @@ typedef enum {retardo_promedio,reporte} solicitud_sb;
 /////////////////////////////////////////////////////////////////////////
 // Definición de estructura para generar comandos hacia el generador     //
 /////////////////////////////////////////////////////////////////////////
-typedef enum {llenado_aleatorio,trans_aleatoria,trans_especifica,sec_trans_aleatorias} instrucciones_gen;
+typedef enum {caso_general, llenado_aleatorio} instrucciones_gen;
 
 ///////////////////////////////////////////////////////////////////////////////////////
 // Definicion de mailboxes de tipo definido trans_fifo para comunicar las interfaces //
