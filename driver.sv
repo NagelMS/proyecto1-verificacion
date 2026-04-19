@@ -1,5 +1,5 @@
  /////////////////////////////////////////////////////////////////////////////////////////////////////////////
- // Driver/Monitor: este objeto es responsable de la interacción entre el ambiente y el la fifo bajo prueba //
+ // Driver: este objeto es responsable de la interacción entre el ambiente y el la fifo bajo prueba //
  /////////////////////////////////////////////////////////////////////////////////////////////////////////////
   class driver #(parameter width =16);
     virtual fifo_if #(.width(width))vif;
@@ -25,37 +25,37 @@
         transaction.print("Driver: Transaccion recibida");
         $display("Transacciones pendientes en el mbx agnt_drv = %g",agnt_drv_mbx.num());
 
-        while(espera < transaction.retardo)begin
+        while(espera < transaction.retardo) begin
           @(posedge vif.clk);
           espera = espera+1;
           vif.dato_in = transaction.dato;
-	end
+	      end
         case(transaction.tipo)
-	  lectura: begin
-	     @(posedge vif.clk);
-	     vif.pop = 1;
-	     transaction.print("Driver: Transaccion ejecutada");
-	   end
-	   escritura: begin
-	     vif.push = 1;
-	     transaction.print("Driver: Transaccion ejecutada");
-	   end
-	   lectura_escritura: begin
-	     @(posedge vif.clk);
-	     vif.push = 1;
-	     vif.pop  = 1;
-	     transaction.print("Driver: Transaccion ejecutada");
-	   end
-	   reset: begin
-	     vif.rst =1;
-	     transaction.print("Driver: Transaccion ejecutada");
-	   end
-	  default: begin
-	    $display("[%g] Driver Error: la transacción recibida no tiene tipo valido",$time);
-	    $finish;
-	  end
-	endcase    
-	@(posedge vif.clk);
+          lectura: begin
+            @(posedge vif.clk);
+            vif.pop = 1;
+            transaction.print("Driver: Transaccion ejecutada");
+          end
+          escritura: begin
+            vif.push = 1;
+            transaction.print("Driver: Transaccion ejecutada");
+          end
+          lectura_escritura: begin
+            @(posedge vif.clk);
+            vif.push = 1;
+            vif.pop  = 1;
+            transaction.print("Driver: Transaccion ejecutada");
+          end
+          reset: begin
+            vif.rst =1;
+            transaction.print("Driver: Transaccion ejecutada");
+          end
+          default: begin
+            $display("[%g] Driver Error: la transacción recibida no tiene tipo valido",$time);
+            $finish;
+          end
+        endcase    
+        @(posedge vif.clk);
       end
     endtask
   endclass

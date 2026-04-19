@@ -212,7 +212,7 @@ module fifo_generic #(
     if (writeEn) begin
       wrPtrNext = wrPtr + 1;
     end
-    if (readEn) begin
+    if (readEn && !empty) begin // Cambio para evitar underflow
       rdPtrNext = rdPtr + 1;
     end
   end

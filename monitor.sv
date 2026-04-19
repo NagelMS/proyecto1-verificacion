@@ -12,6 +12,8 @@ class monitor #(parameter width =16);
 
     task run();
         $display("[%g] El monitor fue inicializado", $time);
+        // Espera que el reset inicial del driver se libere antes de monitorear
+        @(negedge vif.rst);
         forever begin
             trans_fifo #(.width(width)) transaction;
             // Se muestrea en el negedge para estabilidad de las señales 

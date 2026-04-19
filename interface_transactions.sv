@@ -34,6 +34,17 @@ class trans_fifo #(parameter width = 16);
     this.tipo       = lectura;
   endfunction
 
+  function trans_fifo copy();
+    trans_fifo #(width) c = new();
+    c.retardo     = this.retardo;
+    c.dato        = this.dato;
+    c.dato_leido  = this.dato_leido;
+    c.tiempo      = this.tiempo;
+    c.tipo        = this.tipo;
+    c.max_retardo = this.max_retardo;
+    return c;
+  endfunction
+
   function void print(string tag = "");
     if (tipo == lectura_escritura)
       $display("[%g] %s Tiempo=%g Tipo=%s Retardo=%g dato_in=0x%h dato_out=0x%h",
@@ -64,7 +75,7 @@ interface fifo_if #(parameter width =16) (
 
 
 ////////////////////////////////////////////////////
-// Objeto de transacción usado en el scroreboard  //
+// Objeto de transacción usado en el scoreboard  //
 ////////////////////////////////////////////////////
 
 class trans_sb #(parameter width=16);
@@ -108,7 +119,7 @@ class trans_sb #(parameter width=16);
 endclass
 
 /////////////////////////////////////////////////////////////////////////
-// Definición de estructura para generar comandos hacia el scroreboard //
+// Definición de estructura para generar comandos hacia el scoreboard //
 /////////////////////////////////////////////////////////////////////////
 typedef enum {retardo_promedio,reporte} solicitud_sb;
 
