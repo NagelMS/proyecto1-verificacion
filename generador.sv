@@ -1,6 +1,3 @@
-Generador · SV
-Copy
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Generador: maneja secuencias de transacciones para el escenario de prueba.                   //
 //                                                                                              //
