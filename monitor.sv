@@ -8,7 +8,7 @@
 class monitor #(parameter width =16);
   
     virtual fifo_if #(.width(width)) vif; // Interfaz virtual
-    trans_fifo_mbx mon_chkr_mbx; // Mailbox hacia el checker
+    fifo_pkg #(.width(width))::mbx_t mon_chkr_mbx; // Mailbox hacia el checker
 
     task run();
         $display("[%g] El monitor fue inicializado", $time);

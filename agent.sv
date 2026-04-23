@@ -4,9 +4,9 @@
 ////////////////////////////////////////////////////////////////////////////////////////////
 
 class agent #(parameter width = 16, parameter depth = 8);
-  trans_fifo_mbx gen_agent_mbx;   // entrada: transacciones del generador
-  trans_fifo_mbx agent_drv_mbx;   // salida: al driver para ejecutar en el DUT
-  trans_fifo_mbx agent_scrb_mbx;  // salida: al scoreboard como base de datos
+  fifo_pkg #(.width(width))::mbx_t gen_agent_mbx;   // entrada: transacciones del generador
+  fifo_pkg #(.width(width))::mbx_t agent_drv_mbx;   // salida: al driver para ejecutar en el DUT
+  fifo_pkg #(.width(width))::mbx_t agent_scrb_mbx;  // salida: al scoreboard como base de datos
 
   trans_fifo #(.width(width)) transaccion;
 

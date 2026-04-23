@@ -5,8 +5,8 @@
 ////////////////////////////////////////////////////////////////////////////////////////////
 
 class score_board #(parameter width=16);
-  trans_fifo_mbx      agnt_sb_mbx;  // entrada: transacciones planificadas del agente
-  trans_fifo_mbx      sb_chkr_mbx;  // salida: transacciones crudas para el checker
+  fifo_pkg #(.width(width))::mbx_t agnt_sb_mbx;  // entrada: transacciones planificadas del agente
+  fifo_pkg #(.width(width))::mbx_t sb_chkr_mbx;  // salida: transacciones crudas para el checker
   comando_test_sb_mbx test_sb_mbx;  // entrada: comandos del test
 
   trans_fifo #(.width(width)) historial[$]; // registro completo de transacciones

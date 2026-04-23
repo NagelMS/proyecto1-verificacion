@@ -16,11 +16,11 @@ class ambiente #(parameter width = 16, parameter depth = 8);
   virtual fifo_if #(.width(width)) _if;
 
   // Mailboxes internos
-  trans_fifo_mbx       gen_agent_mbx;   // generador -> agente
-  trans_fifo_mbx       agent_drv_mbx;   // agente -> driver
-  trans_fifo_mbx       agent_scrb_mbx;  // agente -> scoreboard
-  trans_fifo_mbx       sb_chkr_mbx;     // scoreboard -> checker
-  trans_fifo_mbx       mon_chkr_mbx;    // monitor -> checker
+  fifo_pkg #(.width(width))::mbx_t gen_agent_mbx;   // generador -> agente
+  fifo_pkg #(.width(width))::mbx_t agent_drv_mbx;   // agente -> driver
+  fifo_pkg #(.width(width))::mbx_t agent_scrb_mbx;  // agente -> scoreboard
+  fifo_pkg #(.width(width))::mbx_t sb_chkr_mbx;     // scoreboard -> checker
+  fifo_pkg #(.width(width))::mbx_t mon_chkr_mbx;    // monitor -> checker
   // Mailboxes expuestos al test
   comando_test_sb_mbx  test_sb_mbx;     // test -> scoreboard
   comando_test_gen_mbx test_gen_mbx;    // test -> generador

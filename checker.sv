@@ -13,8 +13,8 @@
 ////////////////////////////////////////////////////////////////////////////////////////////
  
 class checker_c #(parameter width=16, parameter depth=8);
-  trans_fifo_mbx mon_chkr_mbx; // observaciones reales del DUT (desde monitor)
-  trans_fifo_mbx sb_chkr_mbx;  // transacciones planificadas crudas (desde scoreboard)
+  fifo_pkg #(.width(width))::mbx_t mon_chkr_mbx; // observaciones reales del DUT (desde monitor)
+  fifo_pkg #(.width(width))::mbx_t sb_chkr_mbx;  // transacciones planificadas crudas (desde scoreboard)
  
   trans_fifo #(.width(width)) emul_fifo[$]; // modelo dorado de la FIFO
   trans_fifo #(.width(width)) trans_real;   // observación del monitor
