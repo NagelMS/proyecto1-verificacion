@@ -1,6 +1,16 @@
 source synopsys_tools.sh;
 rm -rfv `ls |grep -v ".*\.sv\|.*\.sh"`;
-vcs -Mupdate test_bench.sv  -o salida -full64 -debug_all -sverilog -l log_test +lint=TFIPC-L;
+
+# Aleatorización de parámetros de compilación
+WIDTHS=(8 16 32)
+DEPTHS=(4 8 16 32)
+RAND_WIDTH=${WIDTHS[$RANDOM % ${#WIDTHS[@]}]}
+RAND_DEPTH=${DEPTHS[$RANDOM % ${#DEPTHS[@]}]}
+echo "=== Parámetros seleccionados: WIDTH=$RAND_WIDTH, DEPTH=$RAND_DEPTH ==="
+
+vcs -Mupdate test_bench.sv -o salida -full64 -debug_all -sverilog -l log_test +lint=TFIPC-L \
+    +define+WIDTH=$RAND_WIDTH \
+    +define+DEPTH=$RAND_DEPTH;
 
 # Correr cada caso de esquina
 ./salida +patron_alternancia +pa_ciclos=3
