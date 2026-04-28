@@ -30,8 +30,22 @@ class test #(parameter width = 16, parameter depth = 8);
     // Ver interface_transactions.sv y generador.sv para la lista completa
     // de plusargs disponibles.
  
-    #10000
-    $display("[%g]  Test: Se alcanza el tiempo limite de la prueba", $time);
+    // Espera a que el generador termine de encolar todas las transacciones
+    wait(ambiente_inst.gen_inst.done == 1);
+    $display("[%g]  Test: Generador finalizado, esperando que el pipeline se vacíe", $time);
+
+    // Espera a que los mailboxes del pipeline se vacíen (todas las transacciones ejecutadas)
+    while (ambiente_inst.agent_drv_mbx.num()  > 0 ||
+           ambiente_inst.gen_agent_mbx.num()  > 0 ||
+           ambiente_inst.mon_chkr_mbx.num()   > 0 ||
+           ambiente_inst.sb_chkr_mbx.num()    > 0) begin
+      @(posedge _if.clk);
+    end
+
+    // Ciclos extra para que la última transacción se propague por el monitor y el checker
+    repeat(20) @(posedge _if.clk);
+
+    $display("[%g]  Test: Pipeline vacío — generando reporte final", $time);
     instr_sb = retardo_promedio;
     test_sb_mbx.put(instr_sb);
     instr_sb = reporte;

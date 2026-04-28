@@ -16,10 +16,12 @@
 class generador #(parameter width = 16, parameter depth = 8);
   fifo_pkg #(.width(width))::mbx_t gen_agent_mbx;
   trans_fifo #(.width(width)) transaccion;
- 
+  bit done;
+
   function new;
+    done = 0;
   endfunction
- 
+
   task run;
     int n_trans;
     int n_trans_min, n_trans_max;
@@ -43,5 +45,6 @@ class generador #(parameter width = 16, parameter depth = 8);
     end
  
     $display("[%g]  Generador: lote de %0d transacciones enviado", $time, n_trans);
+    done = 1;
   endtask
 endclass
