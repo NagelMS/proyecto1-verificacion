@@ -6,24 +6,109 @@ vcs -Mupdate test_bench.sv  -o salida -full64 -debug_all -sverilog -l log_test +
 # Escenario activo: prueba general con defaults
 ./salida
  
-# ── Otros escenarios (descomentar el deseado y comentar el anterior) ─────────
+# -----------------------------------------------------------------------------
+# CASO 1 — Llenado con máxima alternancia de patrones (0s, 5s, As, Fs)
+#   Escribe exactamente depth=8 veces con los patrones 0x0000, 0x5555, 0xAAAA
+#   y 0xFFFF intercalados para maximizar la alternancia de bits 0→1→0.
+#   Sin lecturas ni resets. Retardo fijo de 1 ciclo.
+# -----------------------------------------------------------------------------
+./salida \
+  +peso_lectura=0           +peso_escritura=100        \
+  +peso_lectura_escritura=0 +peso_reset=0              \
+  +n_trans_min=8            +n_trans_max=8             \
+  +datos_validos=0,21845,43690,65535                   \
+  +retardo_min=1            +retardo_max=1
  
-# Overflow:
-./salida +peso_lectura=0 +peso_escritura=100 +peso_lectura_escritura=0 +peso_reset=0 \
-         +n_trans_min=20 +n_trans_max=40 +retardo_min=1 +retardo_max=2
+# -----------------------------------------------------------------------------
+# CASO 2 — Overflow
+#   Solo escrituras en cantidad mayor que depth (entre 12 y 20).
+#   Retardos mínimos para la mayor presión posible sobre la FIFO llena.
+#   Datos en todo el rango.
+# -----------------------------------------------------------------------------
+./salida \
+  +peso_lectura=0           +peso_escritura=100        \
+  +peso_lectura_escritura=0 +peso_reset=0              \
+  +n_trans_min=12           +n_trans_max=20            \
+  +dato_min=0               +dato_max=65535            \
+  +retardo_min=1            +retardo_max=2
  
-# Underflow:
-./salida +peso_lectura=100 +peso_escritura=0 +peso_lectura_escritura=0 +peso_reset=0
+# -----------------------------------------------------------------------------
+# CASO 3 — Underflow
+#   Solo lecturas sobre una FIFO que comienza vacía.
+#   El checker registra cada intento como underflow.
+# -----------------------------------------------------------------------------
+./salida \
+  +peso_lectura=100         +peso_escritura=0          \
+  +peso_lectura_escritura=0 +peso_reset=0              \
+  +n_trans_min=8            +n_trans_max=16            \
+  +dato_min=0               +dato_max=65535            \
+  +retardo_min=2            +retardo_max=5
  
-# Alta frecuencia de resets:
-./salida +peso_reset=60 +peso_lectura=15 +peso_escritura=15 +peso_lectura_escritura=10
+# -----------------------------------------------------------------------------
+# CASO 4 — Pop y Push simultáneo — carga BAJA
+#   Solo lectura_escritura con retardos largos (baja densidad de eventos).
+# -----------------------------------------------------------------------------
+./salida \
+  +peso_lectura=0           +peso_escritura=0          \
+  +peso_lectura_escritura=100 +peso_reset=0            \
+  +n_trans_min=8            +n_trans_max=12            \
+  +dato_min=0               +dato_max=65535            \
+  +retardo_min=10           +retardo_max=20
  
-# Solo lectura-escritura simultánea:
-./salida +peso_lectura=0 +peso_escritura=0 +peso_lectura_escritura=100 +peso_reset=0 \
-         +retardo_min=8 +retardo_max=20
+# -----------------------------------------------------------------------------
+# CASO 5 — Pop y Push simultáneo — carga MEDIA
+#   Solo lectura_escritura con retardos medios.
+# -----------------------------------------------------------------------------
+./salida \
+  +peso_lectura=0           +peso_escritura=0          \
+  +peso_lectura_escritura=100 +peso_reset=0            \
+  +n_trans_min=8            +n_trans_max=16            \
+  +dato_min=0               +dato_max=65535            \
+  +retardo_min=4            +retardo_max=8
  
-# Datos de valores específicos (bordes y potencias de 2):
-./salida +datos_validos=0,1,2,127,128,32767,32768,65534,65535
+# -----------------------------------------------------------------------------
+# CASO 6 — Pop y Push simultáneo — carga ALTA
+#   Solo lectura_escritura con retardos mínimos (máxima densidad de eventos).
+# -----------------------------------------------------------------------------
+./salida \
+  +peso_lectura=0           +peso_escritura=0          \
+  +peso_lectura_escritura=100 +peso_reset=0            \
+  +n_trans_min=16           +n_trans_max=32            \
+  +dato_min=0               +dato_max=65535            \
+  +retardo_min=1            +retardo_max=2
  
-# Rango continuo acotado (solo valores entre 100 y 200):
-./salida +dato_min=100 +dato_max=200
+# -----------------------------------------------------------------------------
+# CASO 7 — Reset con FIFO llena
+#   Pesos sesgados a escritura para mantener la FIFO llena entre resets.
+#   Alta proporción de resets para que la mayoría ocurran con FIFO saturada.
+# -----------------------------------------------------------------------------
+./salida \
+  +peso_lectura=5           +peso_escritura=45         \
+  +peso_lectura_escritura=0 +peso_reset=50             \
+  +n_trans_min=16           +n_trans_max=24            \
+  +dato_min=0               +dato_max=65535            \
+  +retardo_min=1            +retardo_max=3
+ 
+# -----------------------------------------------------------------------------
+# CASO 8 — Reset con FIFO vacía
+#   Solo resets, sin ninguna escritura previa. La FIFO siempre está vacía
+#   cuando llega el reset.
+# -----------------------------------------------------------------------------
+./salida \
+  +peso_lectura=0           +peso_escritura=0          \
+  +peso_lectura_escritura=0 +peso_reset=100            \
+  +n_trans_min=8            +n_trans_max=16            \
+  +dato_min=0               +dato_max=65535            \
+  +retardo_min=2            +retardo_max=6
+ 
+# -----------------------------------------------------------------------------
+# CASO 9 — Reset con FIFO a la mitad (depth/2 = 4 entradas ocupadas)
+#   Escrituras > lecturas para mantener ocupación media antes de cada reset.
+#   Reset frecuente (peso 40) para que la mayoría ocurran con FIFO semi-llena.
+# -----------------------------------------------------------------------------
+./salida \
+  +peso_lectura=15          +peso_escritura=45         \
+  +peso_lectura_escritura=0 +peso_reset=40             \
+  +n_trans_min=12           +n_trans_max=20            \
+  +dato_min=0               +dato_max=65535            \
+  +retardo_min=2            +retardo_max=5
