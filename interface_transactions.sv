@@ -61,19 +61,18 @@ class trans_fifo #(parameter width = 16);
   // Rangos de retardo leídos desde plusargs
   int retardo_min, retardo_max;
  
-  // Set de valores válidos para c_dato.
-  // El constructor lo rellena de una de estas dos formas según los plusargs:
+  // Datos: dos constraints mutuamente excluyentes, activados desde el constructor.
   //
-  //   +datos_validos=v0,v1,...   → valores discretos específicos
-  //   +dato_min=N +dato_max=M    → un rango continuo [N:M] como range item de inside
-  //   (ninguno)                  → rango completo [0 : 2^width-1]
+  //   +datos_validos=v0,v1,...  → c_dato_lista ON,  c_dato_rango OFF
+  //                                valores discretos no contiguos
+  //   +dato_min=N +dato_max=M   → c_dato_rango ON,  c_dato_lista OFF
+  //                                rango continuo [N:M]
+  //   (ninguno)                 → c_dato_rango ON  con [0 : 2^width-1]
   //
-  // En los tres casos c_dato es el mismo constraint — no hay constraint_mode.
-  // El solver de SV trata igual un range item [lo:hi] que valores individuales
-  // dentro de un set de inside{}.
-  typedef struct { bit [width-1:0] lo; bit [width-1:0] hi; } rango_t;
-  rango_t datos_set[$];   // cada entrada representa el rango [lo:hi]
-                          // si lo==hi es un valor puntual
+  // El constructor activa el modo correcto con constraint_mode().
+  // Externamente el comportamiento es un caso general único.
+  bit [width-1:0] dato_min_r, dato_max_r;   // usados por c_dato_rango
+  bit [width-1:0] datos_lista[$];           // usados por c_dato_lista
  
   // Pesos de tipo leídos desde plusargs
   int peso_lectura, peso_escritura, peso_lectura_escritura, peso_reset;
@@ -87,14 +86,21 @@ class trans_fifo #(parameter width = 16);
   }
  
   // ------------------------------------------------------------------
-  // Constraint de dato: un único constraint que funciona tanto para
-  // valores discretos como para rangos continuos.
-  // datos_set[] se construye en el constructor desde los plusargs;
-  // cada entrada {lo, hi} se presenta al solver como [lo:hi].
-  // Con lo==hi el solver lo trata como valor puntual.
+  // Constraint modo rango: dato en [dato_min_r, dato_max_r].
+  // Activo por defecto. El solver trabaja con los bounds directamente —
+  // sin arrays, sin loops.
   // ------------------------------------------------------------------
-  constraint c_dato {
-    dato inside {datos_set};
+  constraint c_dato_rango {
+    dato >= dato_min_r;
+    dato <= dato_max_r;
+  }
+ 
+  // ------------------------------------------------------------------
+  // Constraint modo lista: dato elegido entre valores discretos.
+  // Desactivado por defecto. Se activa solo con +datos_validos.
+  // ------------------------------------------------------------------
+  constraint c_dato_lista {
+    dato inside {datos_lista};
   }
  
   // ------------------------------------------------------------------
@@ -111,34 +117,34 @@ class trans_fifo #(parameter width = 16);
   }
  
   // ------------------------------------------------------------------
-  // Constructor: lee plusargs y construye datos_set[] uniformemente.
+  // Constructor: lee plusargs y activa el constraint de dato correcto.
   //
-  //   +datos_validos=v0,v1,...   Valores puntuales — cada vi → {vi, vi}
-  //   +dato_min=N +dato_max=M    Rango continuo   — una entrada {N, M}
-  //   (ninguno)                  Rango completo   — una entrada {0, 2^w-1}
+  //   +datos_validos=v0,v1,...  → c_dato_lista ON,  c_dato_rango OFF
+  //   +dato_min=N +dato_max=M   → c_dato_rango ON,  c_dato_lista OFF
+  //   (ninguno)                 → c_dato_rango ON  con [0 : 2^width-1]
   // ------------------------------------------------------------------
   function new(int ret=0, bit[width-1:0] dto=0, int tmp=0, tipo_trans tpo=lectura);
     string           lista_str;
     string           token;
     int              coma_pos;
     longint unsigned lval;
-    rango_t          entrada;
-    bit [width-1:0]  dato_min_v, dato_max_v;
  
     this.retardo    = ret;
     this.dato       = dto;
     this.dato_leido = 0;
     this.tiempo     = tmp;
     this.tipo       = tpo;
-    this.datos_set.delete();
+    this.datos_lista.delete();
  
     // ── Retardo ──────────────────────────────────────────────────────
     if (!$value$plusargs("retardo_min=%d", this.retardo_min)) this.retardo_min = 1;
     if (!$value$plusargs("retardo_max=%d", this.retardo_max)) this.retardo_max = 10;
  
-    // ── Set de datos válidos ──────────────────────────────────────────
+    // ── Modo de dato ──────────────────────────────────────────────────
     if ($value$plusargs("datos_validos=%s", lista_str)) begin
-      // Valores discretos: cada token se inserta como {val, val}
+      // Modo lista: parsear "v0,v1,..." y cargar datos_lista[]
+      c_dato_rango.constraint_mode(0);
+      c_dato_lista.constraint_mode(1);
       while (lista_str.len() > 0) begin
         coma_pos = -1;
         for (int i = 0; i < lista_str.len(); i++) begin
@@ -151,19 +157,15 @@ class trans_fifo #(parameter width = 16);
           token     = lista_str;
           lista_str = "";
         end
-        lval        = longint'(token.atoi());
-        entrada.lo = lval[width-1:0];
-        entrada.hi  = entrada.lo;
-        this.datos_set.push_back(entrada);
+        lval = longint unsigned'(token.atoi());
+        this.datos_lista.push_back(lval[width-1:0]);
       end
- 
     end else begin
-      // Rango continuo: una sola entrada {dato_min_v, dato_max_v}
-      if (!$value$plusargs("dato_min=%d", dato_min_v)) dato_min_v = '0;
-      if (!$value$plusargs("dato_max=%d", dato_max_v)) dato_max_v = '1;
-      entrada.lo = dato_min_v;
-      entrada.hi = dato_max_v;
-      this.datos_set.push_back(entrada);
+      // Modo rango: solo se leen los bounds, sin generar ningún array
+      c_dato_lista.constraint_mode(0);
+      c_dato_rango.constraint_mode(1);
+      if (!$value$plusargs("dato_min=%d", this.dato_min_r)) this.dato_min_r = '0;
+      if (!$value$plusargs("dato_max=%d", this.dato_max_r)) this.dato_max_r = '1;
     end
  
     // ── Pesos de tipo ─────────────────────────────────────────────────
@@ -190,11 +192,15 @@ class trans_fifo #(parameter width = 16);
     c.tipo                   = this.tipo;
     c.retardo_min            = this.retardo_min;
     c.retardo_max            = this.retardo_max;
-    c.datos_set              = this.datos_set;
+    c.dato_min_r             = this.dato_min_r;
+    c.dato_max_r             = this.dato_max_r;
+    c.datos_lista            = this.datos_lista;
     c.peso_lectura           = this.peso_lectura;
     c.peso_escritura         = this.peso_escritura;
     c.peso_lectura_escritura = this.peso_lectura_escritura;
     c.peso_reset             = this.peso_reset;
+    c.c_dato_rango.constraint_mode(this.c_dato_rango.constraint_mode());
+    c.c_dato_lista.constraint_mode(this.c_dato_lista.constraint_mode());
     return c;
   endfunction
  
