@@ -1,9 +1,9 @@
 //////////////////////////////////////////////////////////////
 // Definición del tipo de transacciones posibles en la fifo //
 //////////////////////////////////////////////////////////////
- 
+
 typedef enum { lectura, escritura, lectura_escritura, reset } tipo_trans;
- 
+
 /////////////////////////////////////////////////////////////////////////////////////////
 // Transacción: representa las transacciones que entran y salen de la FIFO.            //
 //                                                                                     //
@@ -50,17 +50,17 @@ typedef enum { lectura, escritura, lectura_escritura, reset } tipo_trans;
 //  ./salida +dato_min=100 +dato_max=200                                               //
 //                                                                                     //
 /////////////////////////////////////////////////////////////////////////////////////////
- 
+
 class trans_fifo #(parameter width = 16);
   rand int             retardo;    // retardo en ciclos antes de ejecutar la transacción
   rand bit [width-1:0] dato;       // dato de entrada al DUT
   bit  [width-1:0]     dato_leido; // dato de salida del DUT (no aleatorio)
   int                  tiempo;
   rand tipo_trans      tipo;
- 
+
   // Rangos de retardo leídos desde plusargs
   int retardo_min, retardo_max;
- 
+
   // Datos: dos constraints mutuamente excluyentes, activados desde el constructor.
   //
   //   +datos_validos=v0,v1,...  → c_dato_lista ON,  c_dato_rango OFF
@@ -73,10 +73,10 @@ class trans_fifo #(parameter width = 16);
   // Externamente el comportamiento es un caso general único.
   bit [width-1:0] dato_min_r, dato_max_r;   // usados por c_dato_rango
   bit [width-1:0] datos_lista[$];           // usados por c_dato_lista
- 
+
   // Pesos de tipo leídos desde plusargs
   int peso_lectura, peso_escritura, peso_lectura_escritura, peso_reset;
- 
+
   // ------------------------------------------------------------------
   // Constraint de retardo: [retardo_min, retardo_max]
   // ------------------------------------------------------------------
@@ -84,7 +84,7 @@ class trans_fifo #(parameter width = 16);
     retardo >= retardo_min;
     retardo <= retardo_max;
   }
- 
+
   // ------------------------------------------------------------------
   // Constraint modo rango: dato en [dato_min_r, dato_max_r].
   // Activo por defecto. El solver trabaja con los bounds directamente —
@@ -94,7 +94,7 @@ class trans_fifo #(parameter width = 16);
     dato >= dato_min_r;
     dato <= dato_max_r;
   }
- 
+
   // ------------------------------------------------------------------
   // Constraint modo lista: dato elegido entre valores discretos.
   // Desactivado por defecto. Se activa solo con +datos_validos.
@@ -102,7 +102,7 @@ class trans_fifo #(parameter width = 16);
   constraint c_dato_lista {
     dato inside {datos_lista};
   }
- 
+
   // ------------------------------------------------------------------
   // Constraint de tipo: distribución weighted por pesos desde plusargs.
   // Peso = 0 excluye ese tipo de la aleatorización.
@@ -115,7 +115,7 @@ class trans_fifo #(parameter width = 16);
       reset             := peso_reset
     };
   }
- 
+
   // ------------------------------------------------------------------
   // Constructor: lee plusargs y activa el constraint de dato correcto.
   //
@@ -127,19 +127,19 @@ class trans_fifo #(parameter width = 16);
     string           lista_str;
     string           token;
     int              coma_pos;
-    longint unsigned lval;
- 
+    longint lval;
+
     this.retardo    = ret;
     this.dato       = dto;
     this.dato_leido = 0;
     this.tiempo     = tmp;
     this.tipo       = tpo;
     this.datos_lista.delete();
- 
+
     // ── Retardo ──────────────────────────────────────────────────────
     if (!$value$plusargs("retardo_min=%d", this.retardo_min)) this.retardo_min = 1;
     if (!$value$plusargs("retardo_max=%d", this.retardo_max)) this.retardo_max = 10;
- 
+
     // ── Modo de dato ──────────────────────────────────────────────────
     if ($value$plusargs("datos_validos=%s", lista_str)) begin
       // Modo lista: parsear "v0,v1,..." y cargar datos_lista[]
@@ -157,7 +157,7 @@ class trans_fifo #(parameter width = 16);
           token     = lista_str;
           lista_str = "";
         end
-        lval = longint unsigned'(token.atoi());
+        lval = longint'(token.atoi());
         this.datos_lista.push_back(lval[width-1:0]);
       end
     end else begin
@@ -167,14 +167,14 @@ class trans_fifo #(parameter width = 16);
       if (!$value$plusargs("dato_min=%d", this.dato_min_r)) this.dato_min_r = '0;
       if (!$value$plusargs("dato_max=%d", this.dato_max_r)) this.dato_max_r = '1;
     end
- 
+
     // ── Pesos de tipo ─────────────────────────────────────────────────
     if (!$value$plusargs("peso_lectura=%d",          this.peso_lectura))          this.peso_lectura          = 30;
     if (!$value$plusargs("peso_escritura=%d",         this.peso_escritura))         this.peso_escritura         = 30;
     if (!$value$plusargs("peso_lectura_escritura=%d", this.peso_lectura_escritura)) this.peso_lectura_escritura = 30;
     if (!$value$plusargs("peso_reset=%d",             this.peso_reset))             this.peso_reset             = 10;
   endfunction
- 
+
   function void clean();
     this.retardo    = 0;
     this.dato       = 0;
@@ -182,7 +182,7 @@ class trans_fifo #(parameter width = 16);
     this.tiempo     = 0;
     this.tipo       = lectura;
   endfunction
- 
+
   function trans_fifo copy();
     trans_fifo #(width) c = new();
     c.retardo                = this.retardo;
@@ -203,7 +203,7 @@ class trans_fifo #(parameter width = 16);
     c.c_dato_lista.constraint_mode(this.c_dato_lista.constraint_mode());
     return c;
   endfunction
- 
+
   function void print(string tag = "");
     if (tipo == lectura_escritura)
       $display("[%g] %s Tiempo=%g Tipo=%s Retardo=%g dato_in=0x%h dato_out=0x%h",
@@ -213,12 +213,12 @@ class trans_fifo #(parameter width = 16);
                $time, tag, tiempo, this.tipo, this.retardo, this.dato);
   endfunction
 endclass
- 
- 
+
+
 ////////////////////////////////////////////////////////////////
 // Interface: Esta es la interface que se conecta con la FIFO //
 ////////////////////////////////////////////////////////////////
- 
+
 interface fifo_if #(parameter width = 16) (
   input clk
 );
@@ -230,12 +230,12 @@ interface fifo_if #(parameter width = 16) (
   logic [width-1:0] dato_in;
   logic [width-1:0] dato_out;
 endinterface
- 
- 
+
+
 ////////////////////////////////////////////////////
 // Objeto de transacción usado en el scoreboard   //
 ////////////////////////////////////////////////////
- 
+
 class trans_sb #(parameter width = 16);
   bit [width-1:0] dato_enviado;
   int tiempo_push;
@@ -245,7 +245,7 @@ class trans_sb #(parameter width = 16);
   bit underflow;
   bit reset;
   int latencia;
- 
+
   function void clean();
     this.dato_enviado = 0;
     this.tiempo_push  = 0;
@@ -256,11 +256,11 @@ class trans_sb #(parameter width = 16);
     this.reset        = 0;
     this.latencia     = 0;
   endfunction
- 
+
   task calc_latencia;
     this.latencia = this.tiempo_pop - this.tiempo_push;
   endtask
- 
+
   function void print(string tag);
     $display("[%g] %s dato=%h,t_push=%g,t_pop=%g,cmplt=%g,ovrflw=%g,undrflw=%g,rst=%g,ltncy=%g",
              $time, tag,
@@ -274,12 +274,12 @@ class trans_sb #(parameter width = 16);
              this.latencia);
   endfunction
 endclass
- 
+
 /////////////////////////////////////////////////////////////////////////
 // Definición de estructura para generar comandos hacia el scoreboard  //
 /////////////////////////////////////////////////////////////////////////
 typedef enum {retardo_promedio, reporte} solicitud_sb;
- 
+
 ///////////////////////////////////////////////////////////////////////////////////////
 // Definicion de mailboxes                                                            //
 ///////////////////////////////////////////////////////////////////////////////////////
