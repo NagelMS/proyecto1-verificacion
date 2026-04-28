@@ -152,7 +152,7 @@ class trans_fifo #(parameter width = 16);
           lista_str = "";
         end
         lval        = longint'(token.atoi());
-        entrada.lo  = bit [width-1:0]'(lval);
+        entrada.lo = lval[width-1:0];
         entrada.hi  = entrada.lo;
         this.datos_set.push_back(entrada);
       end
