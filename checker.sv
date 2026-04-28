@@ -89,7 +89,6 @@ class checker_c #(parameter width=16, parameter depth=8);
               transacciones_error++;
               $display("[%g] Checker: ERROR [%0d] - esperado=0x%h leido=0x%h",
                        $time, transacciones_error, esperado.dato, trans_real.dato_leido);
-              $finish;
             end
           end
         end
@@ -112,7 +111,6 @@ class checker_c #(parameter width=16, parameter depth=8);
               cnt_simultaneo_err++;
               $display("[%g] Checker: ERROR lectura_escritura [%0d] - esperado=0x%h leido=0x%h",
                        $time, transacciones_error, esperado.dato, trans_real.dato_leido);
-              $finish;
             end
           end
           // Parte escritura: actualizar modelo dorado
