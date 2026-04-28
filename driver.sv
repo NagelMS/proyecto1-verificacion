@@ -3,7 +3,7 @@
  /////////////////////////////////////////////////////////////////////////////////////////////////////////////
   class driver #(parameter width =16);
     virtual fifo_if #(.width(width))vif;
-    trans_fifo_mbx agnt_drv_mbx;
+    fifo_pkg #(.width(width))::mbx_t agnt_drv_mbx;
     int espera;
 
     task run();

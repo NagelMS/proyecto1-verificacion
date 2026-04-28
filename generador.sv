@@ -14,7 +14,7 @@
 ////////////////////////////////////////////////////////////////////////////////////////////
  
 class generador #(parameter width = 16, parameter depth = 8);
-  trans_fifo_mbx gen_agent_mbx;
+  fifo_pkg #(.width(width))::mbx_t gen_agent_mbx;
   trans_fifo #(.width(width)) transaccion;
  
   function new;

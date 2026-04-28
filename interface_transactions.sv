@@ -183,7 +183,7 @@ class trans_fifo #(parameter width = 16);
     this.tipo       = lectura;
   endfunction
 
-  function trans_fifo copy();
+  function trans_fifo #(width) copy();
     trans_fifo #(width) c = new();
     c.retardo                = this.retardo;
     c.dato                   = this.dato;
@@ -212,6 +212,13 @@ class trans_fifo #(parameter width = 16);
       $display("[%g] %s Tiempo=%g Tipo=%s Retardo=%g dato=0x%h",
                $time, tag, tiempo, this.tipo, this.retardo, this.dato);
   endfunction
+endclass
+
+///////////////////////////////////////////////////////////////////////////////////////
+// Clase auxiliar para obtener un typedef de mailbox parametrizado por ancho         //
+///////////////////////////////////////////////////////////////////////////////////////
+class fifo_pkg #(parameter width = 16);
+  typedef mailbox #(trans_fifo #(width)) mbx_t;
 endclass
 
 
@@ -283,6 +290,6 @@ typedef enum {retardo_promedio, reporte} solicitud_sb;
 ///////////////////////////////////////////////////////////////////////////////////////
 // Definicion de mailboxes                                                            //
 ///////////////////////////////////////////////////////////////////////////////////////
-typedef mailbox #(trans_fifo)    trans_fifo_mbx;
+// trans_fifo_mbx reemplazado por fifo_pkg #(.width(W))::mbx_t para soporte de cualquier ancho
 typedef mailbox #(trans_sb)      trans_sb_mbx;
 typedef mailbox #(solicitud_sb)  comando_test_sb_mbx;

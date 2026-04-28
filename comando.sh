@@ -1,10 +1,32 @@
 source /mnt/vol_NFS_rh003/estudiantes/archivos_config/synopsys_tools2.sh;
 rm -rfv `ls |grep -v ".*\.sv\|.*\.sh"`;
-vcs -Mupdate test_bench.sv  -o salida -full64 -debug_all -sverilog -l log_test +lint=TFIPC-L;
+
+# ── Parámetros de compilación ─────────────────────────────────────────────────
+# MODO_PARAMETROS: "default" usa los valores fijos de abajo.
+#                  "random"  elige ancho y profundidad al azar entre opciones válidas.
+MODO_PARAMETROS="default"
+
+FIFO_WIDTH_DEFAULT=16
+FIFO_DEPTH_DEFAULT=256
+
+if [ "$MODO_PARAMETROS" = "random" ]; then
+  WIDTHS=(8 16 32 64)
+  DEPTHS=(4 8 16 32)
+  FIFO_WIDTH=${WIDTHS[$RANDOM % ${#WIDTHS[@]}]}
+  FIFO_DEPTH=${DEPTHS[$RANDOM % ${#DEPTHS[@]}]}
+else
+  FIFO_WIDTH=$FIFO_WIDTH_DEFAULT
+  FIFO_DEPTH=$FIFO_DEPTH_DEFAULT
+fi
+
+echo "Parámetros de compilación: width=${FIFO_WIDTH}  depth=${FIFO_DEPTH} ──"
+
+vcs -Mupdate test_bench.sv -o salida -full64 -debug_all -sverilog -l log_test +lint=TFIPC-L \
+    +define+FIFO_WIDTH=${FIFO_WIDTH}+FIFO_DEPTH=${FIFO_DEPTH};
 
 # ── Ejecución — modificar los plusargs aquí para cambiar el escenario ────────
 # Escenario activo: prueba general con defaults
-./salida
+./salida +ntb_random_seed_automatic
  
 # -----------------------------------------------------------------------------
 # CASO 1 — Llenado con máxima alternancia de patrones (0s, 5s, As, Fs)
