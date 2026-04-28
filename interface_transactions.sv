@@ -61,9 +61,19 @@ class trans_fifo #(parameter width = 16);
   // Rangos de retardo leídos desde plusargs
   int retardo_min, retardo_max;
  
-  // Array de valores válidos para 'dato' — construido en new() desde plusargs.
-  // El constraint c_dato restringe la aleatorización a este conjunto.
-  bit [width-1:0] datos_validos[$];
+  // Set de valores válidos para c_dato.
+  // El constructor lo rellena de una de estas dos formas según los plusargs:
+  //
+  //   +datos_validos=v0,v1,...   → valores discretos específicos
+  //   +dato_min=N +dato_max=M    → un rango continuo [N:M] como range item de inside
+  //   (ninguno)                  → rango completo [0 : 2^width-1]
+  //
+  // En los tres casos c_dato es el mismo constraint — no hay constraint_mode.
+  // El solver de SV trata igual un range item [lo:hi] que valores individuales
+  // dentro de un set de inside{}.
+  typedef struct { bit [width-1:0] lo; bit [width-1:0] hi; } rango_t;
+  rango_t datos_set[$];   // cada entrada representa el rango [lo:hi]
+                          // si lo==hi es un valor puntual
  
   // Pesos de tipo leídos desde plusargs
   int peso_lectura, peso_escritura, peso_lectura_escritura, peso_reset;
@@ -77,13 +87,14 @@ class trans_fifo #(parameter width = 16);
   }
  
   // ------------------------------------------------------------------
-  // Constraint de dato: el solucionador escoge dentro del array.
-  // La distribución entre los elementos es uniforme.
-  // Para agregar valores específicos basta con modificar datos_validos[]
-  // desde comando.sh sin recompilar.
+  // Constraint de dato: un único constraint que funciona tanto para
+  // valores discretos como para rangos continuos.
+  // datos_set[] se construye en el constructor desde los plusargs;
+  // cada entrada {lo, hi} se presenta al solver como [lo:hi].
+  // Con lo==hi el solver lo trata como valor puntual.
   // ------------------------------------------------------------------
   constraint c_dato {
-    dato inside {datos_validos};
+    dato inside {datos_set};
   }
  
   // ------------------------------------------------------------------
@@ -100,56 +111,59 @@ class trans_fifo #(parameter width = 16);
   }
  
   // ------------------------------------------------------------------
-  // Constructor: lee todos los plusargs y construye datos_validos[].
+  // Constructor: lee plusargs y construye datos_set[] uniformemente.
   //
-  // Lógica de datos_validos:
-  //   1. Si se pasa +datos_validos=v0,v1,...  → se parsea la lista.
-  //   2. Si no, se usa +dato_min / +dato_max  → rango continuo.
-  //   En ambos casos el resultado queda en el array datos_validos[].
+  //   +datos_validos=v0,v1,...   Valores puntuales — cada vi → {vi, vi}
+  //   +dato_min=N +dato_max=M    Rango continuo   — una entrada {N, M}
+  //   (ninguno)                  Rango completo   — una entrada {0, 2^w-1}
   // ------------------------------------------------------------------
   function new(int ret=0, bit[width-1:0] dto=0, int tmp=0, tipo_trans tpo=lectura);
-    string lista_str;
-    string token;
-    int    dato_min, dato_max;
-    int    val;
+    string           lista_str;
+    string           token;
+    int              coma_pos;
+    longint unsigned lval;
+    rango_t          entrada;
+    bit [width-1:0]  dato_min_v, dato_max_v;
  
     this.retardo    = ret;
     this.dato       = dto;
     this.dato_leido = 0;
     this.tiempo     = tmp;
     this.tipo       = tpo;
+    this.datos_set.delete();
  
     // ── Retardo ──────────────────────────────────────────────────────
     if (!$value$plusargs("retardo_min=%d", this.retardo_min)) this.retardo_min = 1;
     if (!$value$plusargs("retardo_max=%d", this.retardo_max)) this.retardo_max = 10;
  
-    // ── Conjunto de datos válidos ─────────────────────────────────────
-    this.datos_validos.delete();
- 
+    // ── Set de datos válidos ──────────────────────────────────────────
     if ($value$plusargs("datos_validos=%s", lista_str)) begin
-      // Modo lista: parsear "v0,v1,v2,..." separado por comas
+      // Valores discretos: cada token se inserta como {val, val}
       while (lista_str.len() > 0) begin
-        int coma_pos;
         coma_pos = -1;
         for (int i = 0; i < lista_str.len(); i++) begin
           if (lista_str[i] == ",") begin coma_pos = i; break; end
         end
         if (coma_pos >= 0) begin
-          token    = lista_str.substr(0, coma_pos - 1);
+          token     = lista_str.substr(0, coma_pos - 1);
           lista_str = lista_str.substr(coma_pos + 1, lista_str.len() - 1);
         end else begin
-          token    = lista_str;
+          token     = lista_str;
           lista_str = "";
         end
-        val = token.atoi();
-        this.datos_validos.push_back(bit'(val));
+        lval        = longint'(token.atoi());
+        entrada.lo  = bit [width-1:0]'(lval);
+        entrada.hi  = entrada.lo;
+        this.datos_set.push_back(entrada);
       end
+ 
     end else begin
-      // Modo rango: rellenar el array con [dato_min : dato_max]
-      if (!$value$plusargs("dato_min=%d", dato_min)) dato_min = 0;
-      if (!$value$plusargs("dato_max=%d", dato_max)) dato_max = (1 << width) - 1;
-      for (int i = dato_min; i <= dato_max; i++)
-        this.datos_validos.push_back(bit'(i));
+      // Rango continuo: una sola entrada {dato_min_v, dato_max_v}
+      if (!$value$plusargs("dato_min=%d", dato_min_v)) dato_min_v = '0;
+      if (!$value$plusargs("dato_max=%d", dato_max_v)) dato_max_v = '1;
+      entrada.lo = dato_min_v;
+      entrada.hi = dato_max_v;
+      this.datos_set.push_back(entrada);
     end
  
     // ── Pesos de tipo ─────────────────────────────────────────────────
@@ -176,7 +190,7 @@ class trans_fifo #(parameter width = 16);
     c.tipo                   = this.tipo;
     c.retardo_min            = this.retardo_min;
     c.retardo_max            = this.retardo_max;
-    c.datos_validos          = this.datos_validos;   // copia el array completo
+    c.datos_set              = this.datos_set;
     c.peso_lectura           = this.peso_lectura;
     c.peso_escritura         = this.peso_escritura;
     c.peso_lectura_escritura = this.peso_lectura_escritura;
