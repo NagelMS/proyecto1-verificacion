@@ -13,10 +13,16 @@
 ///////////////////////////////////
 // Módulo para correr la prueba  //
 ///////////////////////////////////
-module test_bench; 
+module test_bench;
   reg clk;
-  parameter width = 16;
-  parameter depth = 8;
+  `ifndef FIFO_WIDTH
+    `define FIFO_WIDTH 16
+  `endif
+  `ifndef FIFO_DEPTH
+    `define FIFO_DEPTH 8
+  `endif
+  parameter width = `FIFO_WIDTH;
+  parameter depth = `FIFO_DEPTH;
   test #(.depth(depth),.width(width)) t0;
 
   fifo_if  #(.width(width)) _if(.clk(clk));
